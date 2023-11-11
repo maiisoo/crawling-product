@@ -1,8 +1,9 @@
 import csv
-
+import re
 import requests as requests
 from bs4 import BeautifulSoup
 from utils import get_random_agent, no_accent_vietnamese
+import json
 
 headers = {
             "User-Agent": get_random_agent()
@@ -13,41 +14,65 @@ headers = {
 # list sản phẩm nào mà có >=2 trang thì viết thêm param vào
 #   VD: url = "https://tiki.vn/xit-duong-toc/c11825?page=2"
 
-url = "https://tiki.vn/xit-duong-toc/c11825"
-#nếu có <số trang> thì viết vào biến pageNum này
-pageNumber = ""
+def getDataByCategory(category, pageNum):
+    product_data = []
+    label = category.replace(" ", "_")
+    label = "__label__" + label
+    for pageNumber in range(1, pageNum+1):
+        url = "https://tiki.vn/search?q=" + category + "&page=" + str(pageNumber)
+        print(url)
 
-html = requests.get(url, headers=headers)
-soup = BeautifulSoup(html.text, features="html.parser")
+        html = requests.get(url, headers=headers)
+        # check request valid
+        if html.status_code != 200:
+            print("Error: " + str(html.status_code))
+            exit(1)
+        soup = BeautifulSoup(html.text, features="html.parser")
+        
+        # data = json.loads(soup.find('script', type='application/ld+json').text)
 
-try:
-    category = soup.find('div', class_='title').text
-    print(category)
-except:
-    category = "" #Lỗi thì tự điền tên danh mục
+        #list of script objects
+        scriptList = soup.find_all('script', type='application/ld+json')
 
-#Bỏ cách đầu cuối
-category = category.strip()
+        scriptDictList = []
+        for i in scriptList:
+            scriptDictList.append(json.loads(i.text))
+            # dict dont have key "name":
+            # if "name" not in i.text:
+            #     scriptDictList.remove(i)
 
-print(category+"1")
+        #filter items that dont have key "name"
+        filtered_list = [d for d in scriptDictList if "name" in d]
 
-product_names = [element.h3.text for element in soup.find_all('div', class_='name')]
+        product_names=[]
+        for i in filtered_list:
+            product_names.append(i["name"])
+        
+        for product_name in product_names:
+            product_data.append((label, product_name))
+            print(product_data[-1])
 
-product_data = []
-
-for product_name in product_names:
-    print(product_name) #In ra xem đúng chưa
-    product_data.append((category, product_name))
-
-#Đặt tên file csv
-noAccentCategory = no_accent_vietnamese(category).replace(' ', '_')
-if pageNumber != "":
-    filename = noAccentCategory + "_" + pageNumber + ".csv"
-else:
+    #Đặt tên file csv
+    filename = ""
+    noAccentCategory = no_accent_vietnamese(category).replace(' ', '_').replace('/', '_')
     filename = noAccentCategory + ".csv"
-print(filename)
+    print(filename)
 
-# Viết ra csv, mỗi category 1 file riêng
-with open(f'data/{filename}', 'w', newline='', encoding='utf-8') as filepath:
-    csv_writer = csv.writer(filepath)
-    csv_writer.writerows(product_data)
+    with open(f'data_tiki/{filename}', 'w', newline='', encoding='utf-8') as filepath:
+        csv_writer = csv.writer(filepath)
+        csv_writer.writerows(product_data)
+
+
+categories = []
+
+f = open("categories.txt", "r", encoding="utf8")
+while True:
+    line = f.readline()
+    if not line:
+        break
+    line = line.strip().replace("\n", "")
+    categories.append(line)
+
+# Sửa index tại đây: 1000, 1971
+for i in range(992, 1000):
+    getDataByCategory(categories[i], 5)

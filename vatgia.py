@@ -9,46 +9,54 @@ headers = {
             "User-Agent": get_random_agent()
         }
 
-#Cho url vào đây
-#   VD url = "https://vatgia.com/10757/dong-ho-thong-minh-smartwatch.html"
-# list sản phẩm nào mà có >=2 trang thì viết url+,<số trang>
-#   VD: url = https://vatgia.com/10757/dong-ho-thong-minh-smartwatch.html,2
+def getDataByCategory(category, pageNumber):
+    product_data = []
+    label = category.replace(" ", "_")
+    label = "__label__" + label
+    for num in range(1, pageNumber+1):
+        url = "https://vatgia.com/home/" + category.replace(" ", "+") + ".spvg?page=" + str(num)
+        print(url)
+        html = requests.get(url, headers=headers)
+        soup = BeautifulSoup(html.text, features="html.parser")
 
-url = "https://vatgia.com/10757/dong-ho-thong-minh-smartwatch.html"
-#nếu có <số trang> thì viết vào biến pageNum này
-pageNumber = ""
-html = requests.get(url, headers=headers)
-soup = BeautifulSoup(html.text, features="html.parser")
+        pattern_matching = re.search(r'/(\d+)/', url)
 
-pattern_matching = re.search(r'/(\d+)/', url)
-try:
-    index = pattern_matching.group(1)
-    print(index)
-    category = soup.find('a', idata=index).text
-    print(category)
-except:
-    category = "" #Lỗi index trên thì tự điền tên danh mục
+        product_names = [element.a.text for element in soup.find_all('div', class_='name')]
 
-# Bỏ cách đầu cuối
-category = category.strip()
 
-product_names = [element.a.text for element in soup.find_all('div', class_='name')]
+        for product_name in product_names:
+            # print(product_name) #In ra xem đúng chưa
+            product_data.append((label, product_name))
+            # print product_name
+            print(product_name);
 
-product_data = []
 
-for product_name in product_names:
-    print(product_name) #In ra xem đúng chưa
-    product_data.append((category, product_name))
-
-#Đặt tên file csv
-noAccentCategory = no_accent_vietnamese(category).replace(' ', '_')
-if pageNumber != "":
-    filename = noAccentCategory + "_" + pageNumber + ".csv"
-else:
+    #Đặt tên file csv
+    noAccentCategory = no_accent_vietnamese(category).replace(' ', '_').replace('/', '_')
     filename = noAccentCategory + ".csv"
-print(filename)
+    print(filename)
+    # f = open(f'data/{filename}', 'w', newline='', encoding='utf-8')
+    #f.writelines(f'{product_data}\n')
+    # Viết ra csv, mỗi category 1 file riêng
+    # product_data["category"] = ("__label__" + product_data["category"]).replace(" ", "_")
 
-# Viết ra csv, mỗi category 1 file riêng
-with open(f'data/{filename}', 'w', newline='', encoding='utf-8') as filepath:
-    csv_writer = csv.writer(filepath)
-    csv_writer.writerows(product_data)
+
+    with open(f'data_vatgia/{filename}', 'w', newline='', encoding='utf-8') as filepath:
+        csv_writer = csv.writer(filepath)
+        csv_writer.writerows(product_data)
+
+# getDataByCategory("Điện thoại", 5)
+
+categories = []
+
+f = open("categories.txt", "r", encoding="utf8")
+while True:
+    line = f.readline()
+    if not line:
+        break
+    line = line.strip().replace("\n", "")
+    categories.append(line)
+
+# Sửa index tại đây: 1000, 1971
+for i in range(347, 348):
+    getDataByCategory(categories[i], 5)
